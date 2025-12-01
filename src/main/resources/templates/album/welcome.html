@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Albums • EchoReviews</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="/css/header-footer.css">
+    <link rel="stylesheet" href="/css/search.css">
+
+
+    <link rel="icon" type="image/x-icon" href="/images/logo3.png">
+</head>
+
+<style>
+    .hover-effect {
+        transition: transform 0.2s ease-in-out;
+    }
+    .hover-effect:hover {
+        transform: translateY(-5px);
+    }
+    .album-card img {
+        height: 200px;
+        object-fit: cover;
+    }
+</style>
+
+
+<body>
+
+<div th:replace="~{fragments/header :: header}"></div>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex gap-2">
+            <button id="sortByAlbum" class="btn btn-success active" onclick="sortAlbums('id')">Albums</button>
+            <a href="/artists" class="btn btn-success">Artists</a>
+        </div>
+        <div class="d-flex gap-2">
+            <div class="d-flex flex-column">
+                <div class="d-flex flex-column">
+                    <div id="searchInputs">
+                        <input type="text" id="searchInput" class="form-control mb-2" placeholder="Search albums..." oninput="filterAlbums()">
+                    </div>
+                    <div class="btn-group mt-2" role="group" aria-label="Search filters">
+                        <input type="checkbox" class="btn-check" name="searchFilter" value="artist" id="artistFilter" onchange="updateSearchInputs()">
+                        <label class="btn btn-outline-success" for="artistFilter">Artist</label>
+                        <input type="checkbox" class="btn-check" name="searchFilter" value="year" id="yearFilter" onchange="updateSearchInputs()">
+                        <label class="btn btn-outline-success" for="yearFilter">Year</label>
+                    </div>
+                </div>
+                <button id="viewToggle" class="btn btn-outline-success" onclick="toggleView()">
+                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <h2 id="sectionTitle" class="mb-4">Popular Albums</h2>
+    <div id="albumsGrid" class="row row-cols-1 row-cols-md-3 g-4">
+        <div th:each="album, iterStat : ${albums}" th:if="${iterStat.index < 15}" class="col album-item" th:data-id="${album.id()}" th:data-artist="${album.artistNames()}">
+            <a th:href="@{|/album/${album.id()}|}" class="text-decoration-none">
+                <div class="card h-100 shadow-sm hover-effect">
+                    <img th:src="${album.imageUrl()}" class="card-img-top" alt="Album Cover">
+                    <div class="card-body">
+                        <h5 class="card-title" th:text="${album.title()}">Album Title</h5>
+                        <p class="card-text">
+                            <strong>Artists:</strong> <span th:text="${album.artistNames()}">Artist Names</span><br>
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <template id="albumTemplate">
+            <div class="col album-item" style="display: none;" th:each="album, iterStat : ${albums}" th:if="${iterStat.index >= 15}" th:data-id="${album.id()}" th:data-artist="${album.artistNames()}">
+                <a th:href="@{|/album/${album.id()}|}" class="text-decoration-none">
+                    <div class="card h-100 shadow-sm hover-effect">
+                        <img th:src="${album.imageUrl()}" class="card-img-top" alt="Album Cover">
+                        <div class="card-body">
+                            <h5 class="card-title" th:text="${album.title()}">Album Title</h5>
+                            <p class="card-text">
+                               <strong>Artists:</strong> <span th:text="${album.artistNames()}">Artist Names</span><br>
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </template>
+    </div>
+
+    <div class="alert alert-info d-none" id="noResults">
+        No albums found matching your search.
+    </div>
+
+    <div class="text-center mt-4 mb-4">
+        <button id="loadMoreBtn" class="btn btn-success" onclick="loadMore()">Load More Albums</button>
+    </div>
+
+</div>
+
+<div th:replace="~{fragments/footer :: footer}"></div>
+
+<script>
+    let currentPage = 0;
+    const itemsPerPage = 15;
+    let allAlbumsLoaded = false;
+
+    function updateSearchInputs() {
+        const artistFilter = document.getElementById('artistFilter').checked;
+        const yearFilter = document.getElementById('yearFilter').checked;
+        const searchInputsDiv = document.getElementById('searchInputs');
+        
+        searchInputsDiv.innerHTML = '';
+        
+        if (artistFilter) {
+            const artistInput = document.createElement('input');
+            artistInput.type = 'text';
+            artistInput.id = 'artistInput';
+            artistInput.className = 'form-control mb-2';
+            artistInput.placeholder = 'Search by artist...';
+            artistInput.oninput = filterAlbums;
+            searchInputsDiv.appendChild(artistInput);
+        }
+        
+        if (yearFilter) {
+            const yearInput = document.createElement('input');
+            yearInput.type = 'number';
+            yearInput.id = 'yearInput';
+            yearInput.className = 'form-control mb-2';
+            yearInput.placeholder = 'Search by year...';
+            yearInput.oninput = filterAlbums;
+            searchInputsDiv.appendChild(yearInput);
+        }
+        
+        if (!artistFilter && !yearFilter) {
+            const defaultInput = document.createElement('input');
+            defaultInput.type = 'text';
+            defaultInput.id = 'searchInput';
+            defaultInput.className = 'form-control mb-2';
+            defaultInput.placeholder = 'Search albums...';
+            defaultInput.oninput = filterAlbums;
+            searchInputsDiv.appendChild(defaultInput);
+        }
+    }
+
+    function filterAlbums() {
+        const artistFilter = document.getElementById('artistFilter').checked;
+        const yearFilter = document.getElementById('yearFilter').checked;
+        let searchParams = new URLSearchParams();
+        
+        if (artistFilter) {
+            const artistValue = document.getElementById('artistInput').value.toLowerCase();
+            if (artistValue) {
+                searchParams.append('artist', artistValue);
+            }
+        }
+        
+        if (yearFilter) {
+            const yearValue = document.getElementById('yearInput').value;
+            if (yearValue && !isNaN(yearValue)) {
+                searchParams.append('year', yearValue);
+            }
+        }
+        
+        if (!artistFilter && !yearFilter) {
+            const searchValue = document.getElementById('searchInput').value.toLowerCase();
+            if (searchValue) {
+                searchParams.append('title', searchValue);
+            }
+        }
+        
+        const url = new URL('/api/albums/search', window.location.origin);
+        url.search = searchParams.toString();
+        
+        if (searchParams.toString()) {
+            fetch(url)
+                .then(response => response.json())
+                .then(albums => {
+                    const albumsGrid = document.getElementById('albumsGrid');
+                    albumsGrid.innerHTML = '';
+                    
+                    if (albums.length === 0) {
+                        document.getElementById('noResults').classList.remove('d-none');
+                        return;
+                    }
+                    
+                    document.getElementById('noResults').classList.add('d-none');
+                    albums.forEach(album => {
+                        const albumElement = `
+                            <div class="col album-item" data-id="${album.id}" data-artist="${album.artistNames}">
+                                <a href="/album/${album.id}" class="text-decoration-none">
+                                    <div class="card h-100 shadow-sm hover-effect">
+                                        <img src="${album.imageUrl}" class="card-img-top" alt="Album Cover">
+                                        <div class="card-body">
+                                            <h5 class="card-title">${album.title}</h5>
+                                            <p class="card-text">
+                                                <strong>Artists:</strong> <span>${album.artistNames}</span><br>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </a>
+                            </div>
+                        `;
+                        albumsGrid.insertAdjacentHTML('beforeend', albumElement);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        } else {
+            document.getElementById('noResults').classList.add('d-none');
+            // Reset to initial state or load default albums
+        }
+    }
+
+    function loadMore() {
+        const template = document.getElementById('albumTemplate');
+        const hiddenAlbums = template.content.querySelectorAll('.album-item');
+        const startIndex = currentPage * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        let albumsLoaded = 0;
+
+        hiddenAlbums.forEach((album, index) => {
+            if (index >= startIndex && index < endIndex) {
+                const clone = album.cloneNode(true);
+                clone.style.display = "";
+                document.getElementById('albumsGrid').appendChild(clone);
+                albumsLoaded++;
+            }
+        });
+
+        currentPage++;
+
+        if (albumsLoaded < itemsPerPage || startIndex + albumsLoaded >= hiddenAlbums.length) {
+            document.getElementById('loadMoreBtn').style.display = 'none';
+            allAlbumsLoaded = true;
+        }
+    }
+
+
+    function toggleView() {
+        const grid = document.getElementById('albumsGrid');
+        const button = document.getElementById('viewToggle');
+        const currentCols = grid.classList.contains('row-cols-md-3') ? 3 : 5;
+
+        if (currentCols === 3) {
+            grid.classList.replace('row-cols-md-3', 'row-cols-md-5');
+            button.innerHTML = '<i class="bi bi-grid-fill"></i>';
+        } else {
+            grid.classList.replace('row-cols-md-5', 'row-cols-md-3');
+            button.innerHTML = '<i class="bi bi-grid-3x3-gap-fill"></i>';
+        }
+    }
+
+    function sortAlbums(criteria) {
+        const grid = document.getElementById('albumsGrid');
+        const albums = Array.from(grid.children);
+        const sectionTitle = document.getElementById('sectionTitle');
+
+        albums.sort((a, b) => {
+            if (criteria === 'id') {
+                sectionTitle.textContent = 'Popular Albums';
+                return parseInt(a.getAttribute('data-id')) - parseInt(b.getAttribute('data-id'));
+            } else if (criteria === 'artist') {
+                sectionTitle.textContent = 'Popular Artists';
+                return a.getAttribute('data-artist').localeCompare(b.getAttribute('data-artist'));
+            }
+        });
+
+        albums.forEach(album => grid.appendChild(album));
+    }
+
+    // Initial sort by ID
+    window.onload = function() {
+        sortAlbums('id');
+    };
+</script>
+</body>
+</html>
